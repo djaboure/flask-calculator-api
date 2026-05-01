@@ -1,0 +1,47 @@
+.gitlab-ci.yml
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environnement virtuel (très important de ne pas l'inclure)
+venv/
+env/
+.venv/
+
+# Dossiers de test et de couverture
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+nosetests.xml
+coverage
+# Rapport de couverture spécifique à SonarQube
+.scannerwork/
+
+# Distribution / Packages (si vous buildiez un .whl)
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Fichiers de configuration IDE
+.vscode/
+.idea/
+
+# Fichiers système
+.DS_Store
+Thumbs.db
