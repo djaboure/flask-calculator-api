@@ -57,11 +57,15 @@ jobs:
           else
             echo "SONAR_HOST_URL est bien présent"
           fi
+      - name: Install SonarScanner
+        run: |
+          npm install -g sonarqube-scanner
+
       - name: SonarQube analysis
-        uses: SonarSource/sonarqube-scan-action@v6
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          sonar-scanner \
+            -Dsonar.host.url="${{ secrets.SONAR_HOST_URL }}" \
+            -Dsonar.login="${{ secrets.SONAR_TOKEN }}"
 
       - name: Package application
         run: |
