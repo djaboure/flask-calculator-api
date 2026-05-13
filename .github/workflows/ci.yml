@@ -42,7 +42,21 @@ jobs:
         with:
           name: pytest-report
           path: test-results.xml
+      - name: Check SonarQube secrets
+        run: |
+          if [ -z "${{ secrets.SONAR_TOKEN }}" ]; then
+            echo "Erreur : SONAR_TOKEN est vide ou absent"
+            exit 1
+          else
+            echo "SONAR_TOKEN est bien présent"
+          fi
 
+          if [ -z "${{ secrets.SONAR_HOST_URL }}" ]; then
+            echo "Erreur : SONAR_HOST_URL est vide ou absent"
+            exit 1
+          else
+            echo "SONAR_HOST_URL est bien présent"
+          fi
       - name: SonarQube analysis
         uses: SonarSource/sonarqube-scan-action@v6
         env:
