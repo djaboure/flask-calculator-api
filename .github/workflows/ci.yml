@@ -11,8 +11,82 @@ on:
       - master
 
 jobs:
-  ci:
+  test:
+    name: Tests unitaires avec couverture
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Installation de Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installation des dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Exécution des tests avec couverture
+        run: |
+          pytest tests -v --cov=. --cov-report=xml --junitxml=test-results.xml
+
+      - name: Archivage du rapport de couverture
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+      - name: Archivage du rapport de tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report
+          path: test-results.xml
+
+  sonar:
+    name: Analyse SonarQube
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Récupération du rapport coverage.xml
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+          path: .
+
+      - name: Installation de SonarScanner
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl unzip
+          curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+          unzip -q sonar-scanner.zip
+          echo "$PWD/sonar-scanner-5.0.1.3006-linux/bin" >> $GITHUB_PATH
+
+      - name: Analyse SonarQube
+        run: |
+          sonar-scanner \
+            -Dsonar.projectKey=flask-calculator-api \
+            -Dsonar.projectName="Flask Calculator API" \
+            -Dsonar.projectVersion=1.0 \
+            -Dsonar.sources=. \
+            -Dsonar.exclusions=tests/**,venv/**,__pycache__/**,.pytest_cache/**,.github/**,dist/**,coverage.xml,test-results.xml \
+            -Dsonar.tests=tests \
+            -Dsonar.test.inclusions=tests/**/*.py \
+            -Dsonar.python.coverage.reportPaths=coverage.xml \
+            -Dsonar.host.url="${{ secrets.SONAR_HOST_URL }}" \
+            -Dsonar.login="${{ secrets.SONAR_TOKEN }}"
+
+  deploy:
+    name: Archivage de l’artefact sur Nexus
+    runs-on: ubuntu-latest
+    needs: sonar
 
     env:
       PROJECT_NAME: flask-calculator-api
@@ -20,40 +94,10 @@ jobs:
       NEXUS_REPOSITORY: raw-hosted
 
     steps:
-      - name: Checkout code
+      - name: Récupération du code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.9"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run tests with coverage
-        run: |
-          pytest --cov=. --cov-report=xml --junitxml=test-results.xml
-
-      - name: Upload test report
-        uses: actions/upload-artifact@v4
-        with:
-          name: pytest-report
-          path: test-results.xml
-          
-      - name: Install SonarScanner
-        run: |
-          npm install -g sonarqube-scanner
-
-      - name: SonarQube analysis
-        run: |
-          sonar-scanner \
-            -Dsonar.host.url="${{ secrets.SONAR_HOST_URL }}" \
-            -Dsonar.login="${{ secrets.SONAR_TOKEN }}"
-
-      - name: Package application
+      - name: Création de l’archive applicative
         run: |
           mkdir -p dist
           tar \
@@ -65,14 +109,19 @@ jobs:
             --exclude='.pytest_cache' \
             -czf dist/${PROJECT_NAME}-${ARTIFACT_VERSION}.tar.gz .
 
-      - name: Upload artifact in GitHub Actions
+      - name: Vérification de l’archive créée
+        run: |
+          ls -lh dist/
+
+      - name: Archivage dans GitHub Actions
         uses: actions/upload-artifact@v4
         with:
           name: flask-application
           path: dist/*.tar.gz
 
-      - name: Upload artifact to Nexus
+      - name: Upload de l’artefact vers Nexus
         run: |
-          curl -u "${{ secrets.NEXUS_USERNAME }}:${{ secrets.NEXUS_PASSWORD }}" \
+          curl --fail --show-error --verbose \
+            -u "${{ secrets.NEXUS_USERNAME }}:${{ secrets.NEXUS_PASSWORD }}" \
             --upload-file dist/${PROJECT_NAME}-${ARTIFACT_VERSION}.tar.gz \
             "${{ secrets.NEXUS_URL }}/repository/${NEXUS_REPOSITORY}/${PROJECT_NAME}/${PROJECT_NAME}-${ARTIFACT_VERSION}.tar.gz"
